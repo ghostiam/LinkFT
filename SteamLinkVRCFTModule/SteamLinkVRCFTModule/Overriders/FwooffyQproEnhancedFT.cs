@@ -34,6 +34,9 @@ public class FwooffyQproEnhancedFT : Overrider.IOverider {
 	PupilPacket _lastPupilPacket;
 	long _lastPupilPacketReceivedAt;
 
+	TonguePacket _lastTonguePacket;
+	long _lastTonguePacketReceivedAt;
+
 
 	public FwooffyQproEnhancedFT(ILogger logger) {
 		_logger = logger;
@@ -56,7 +59,7 @@ public class FwooffyQproEnhancedFT : Overrider.IOverider {
 
 		try {
 			_tongueSocket = new UdpClient(new IPEndPoint(IPAddress.Loopback, TonguePort));
-			_tongueSocket.Client.Blocking = false;
+			Task.Run(ReceiveTongueData, _cancellationTokenSource.Token);
 		} catch (SocketException error) {
 			_logger.LogError(error, "Could not bind the local Quest Pro tongue port {Port}", TonguePort);
 		}
@@ -104,7 +107,24 @@ public class FwooffyQproEnhancedFT : Overrider.IOverider {
 	}
 
 	public float Apply(UnifiedExpressions expression, float nativeValue) {
-		return nativeValue;
+		switch (expression) {
+			case UnifiedExpressions.TongueOut:
+			case UnifiedExpressions.TongueUp:
+			case UnifiedExpressions.TongueDown:
+			case UnifiedExpressions.TongueLeft:
+			case UnifiedExpressions.TongueRight:
+			case UnifiedExpressions.TongueRoll:
+			case UnifiedExpressions.TongueBendDown:
+			case UnifiedExpressions.TongueCurlUp:
+			case UnifiedExpressions.TongueSquish:
+			case UnifiedExpressions.TongueFlat:
+			case UnifiedExpressions.TongueTwistLeft:
+			case UnifiedExpressions.TongueTwistRight:
+				return FromTonguePacketOrDefault(expression, nativeValue);
+
+			default:
+				return nativeValue;
+		}
 	}
 
 	private float FromGazePacketOrDefault(bool isRight, bool isX, float defaultValue) {
@@ -132,6 +152,33 @@ public class FwooffyQproEnhancedFT : Overrider.IOverider {
 		if (!isValid) return defaultValue;
 
 		return isRight ? data.RightPupilMm : data.LeftPupilMm;
+	}
+
+	private float FromTonguePacketOrDefault(UnifiedExpressions expression, float defaultValue) {
+		long now = Environment.TickCount64;
+		bool isFresh = _lastTonguePacketReceivedAt != 0 && now - _lastTonguePacketReceivedAt <= TongueTimeoutMs;
+		if (!isFresh) return defaultValue;
+
+		var data = _lastTonguePacket;
+		if (!data.IsTongueValid) return defaultValue;
+
+		float value = expression switch {
+			UnifiedExpressions.TongueOut => data.TongueOut,
+			UnifiedExpressions.TongueUp => data.TongueUp,
+			UnifiedExpressions.TongueDown => data.TongueDown,
+			UnifiedExpressions.TongueLeft => data.TongueLeft,
+			UnifiedExpressions.TongueRight => data.TongueRight,
+			UnifiedExpressions.TongueRoll => data.TongueRoll,
+			UnifiedExpressions.TongueBendDown => data.TongueBendDown,
+			UnifiedExpressions.TongueCurlUp => data.TongueCurlUp,
+			UnifiedExpressions.TongueSquish => data.TongueSquish,
+			UnifiedExpressions.TongueFlat => data.TongueFlat,
+			UnifiedExpressions.TongueTwistLeft => data.TongueTwistLeft,
+			UnifiedExpressions.TongueTwistRight => data.TongueTwistRight,
+			_ => defaultValue
+		};
+
+		return float.IsFinite(value) ? Math.Clamp(value, 0.0f, 1.0f) : defaultValue;
 	}
 
 	[StructLayout(LayoutKind.Sequential, Pack = 1)]
@@ -180,6 +227,37 @@ public class FwooffyQproEnhancedFT : Overrider.IOverider {
 		public bool IsHeaderValid => Magic == ExpectedMagic && Version == ExpectedVersion;
 		public bool IsLeftEyeValid => (Flags & PupilFlags.LeftEyeValid) != 0 && float.IsFinite(LeftPupilMm) && LeftPupilMm is >= 2.0f and <= 9.0f;
 		public bool IsRightEyeValid => (Flags & PupilFlags.RightEyeValid) != 0 && float.IsFinite(RightPupilMm) && RightPupilMm is >= 2.0f and <= 9.0f;
+	}
+
+	[StructLayout(LayoutKind.Sequential, Pack = 1)]
+	private readonly struct TonguePacket {
+		public readonly uint Magic;
+		public readonly byte Version;
+		public readonly TongueFlags Flags;
+		public readonly ushort Reserved;
+		public readonly float TongueOut;
+		public readonly float TongueUp;
+		public readonly float TongueDown;
+		public readonly float TongueLeft;
+		public readonly float TongueRight;
+		public readonly float TongueRoll;
+		public readonly float TongueBendDown;
+		public readonly float TongueCurlUp;
+		public readonly float TongueSquish;
+		public readonly float TongueFlat;
+		public readonly float TongueTwistLeft;
+		public readonly float TongueTwistRight;
+
+		[Flags]
+		public enum TongueFlags : byte {
+			None = 0,
+			Enabled = 1 << 0
+		}
+
+		const uint ExpectedMagic = 'Q' | ('P' << 8) | ('T' << 16) | ('O' << 24);
+		const byte ExpectedVersion = 1;
+		public bool IsHeaderValid => Magic == ExpectedMagic && Version == ExpectedVersion;
+		public bool IsTongueValid => (Flags & TongueFlags.Enabled) != 0;
 	}
 
 	private async Task ReceiveGazeData() {
@@ -243,6 +321,38 @@ public class FwooffyQproEnhancedFT : Overrider.IOverider {
 			_logger.LogError(ex, "SocketException in ReceivePupilData");
 		} catch (Exception ex) {
 			_logger.LogError(ex, "Unexpected error in ReceivePupilData");
+		}
+	}
+
+	private async Task ReceiveTongueData() {
+		if (_tongueSocket is null)
+			return;
+
+		var token = _cancellationTokenSource.Token;
+
+		try {
+			while (!token.IsCancellationRequested) {
+				UdpReceiveResult result = await _tongueSocket.ReceiveAsync(token);
+				byte[] packet = result.Buffer;
+
+				if (packet.Length != TonguePacketBytes)
+					continue;
+
+				TonguePacket data = MemoryMarshal.AsRef<TonguePacket>(packet);
+				if (!data.IsHeaderValid)
+					continue;
+
+				_lastTonguePacket = data;
+				_lastTonguePacketReceivedAt = Environment.TickCount64;
+			}
+		} catch (OperationCanceledException) {
+			// Normal completion when the token is canceled
+		} catch (ObjectDisposedException) {
+			// The socket was closed in Teardown()
+		} catch (SocketException ex) {
+			_logger.LogError(ex, "SocketException in ReceiveTongueData");
+		} catch (Exception ex) {
+			_logger.LogError(ex, "Unexpected error in ReceiveTongueData");
 		}
 	}
 }
