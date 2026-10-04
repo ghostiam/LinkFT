@@ -41,7 +41,9 @@ Added full support and compatibility with [Qpro-Enhanced-FT-Wireless](https://gi
 
 ### Installation Instructions (Qpro-Enhanced-FT-Wireless Setup)
 
-1. Compile or [download](https://github.com/ghostiam/LinkFT/releases) `Qpro.GazeBridge.dll` and `000-Qpro.SteamLink.dll` (these are identical files from the compiled module build).
+> **Important:** Make sure you have removed any other SteamLink modules from `CustomLibs`, otherwise `Qpro-Enhanced-FT-Wireless` will not work.
+
+1. Download `QproFaceTrackingModule.zip` from [Releases](https://github.com/ghostiam/LinkFT/releases/latest) or compile from source.
 2. Place `000-Qpro.SteamLink.dll` into the VRCFT custom libraries folder:
    ```
    %AppData%\VRCFaceTracking\CustomLibs\
