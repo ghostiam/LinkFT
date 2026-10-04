@@ -88,8 +88,18 @@ namespace SteamLinkVRCFTModule
             { NoseSneerLeft,0.0f},
             {NoseSneerRight ,0.0f},
 
-            {TongueCurlUp ,0.0f},
-            {TongueOut ,0.0f},
+            {TongueOut, 0.0f},
+            {TongueUp, 0.0f},
+            {TongueDown, 0.0f},
+            {TongueLeft, 0.0f},
+            {TongueRight, 0.0f},
+            {TongueRoll, 0.0f},
+            {TongueBendDown, 0.0f},
+            {TongueCurlUp, 0.0f},
+            {TongueSquish, 0.0f},
+            {TongueFlat, 0.0f},
+            {TongueTwistLeft, 0.0f},
+            {TongueTwistRight, 0.0f},
 
             };
 
