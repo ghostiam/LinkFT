@@ -89,7 +89,7 @@ public class FwooffyQproEnhancedFT : Overrider.IOverider {
 	public void Initialize() {
 		try {
 			_steamLabelSocket = new UdpClient(AddressFamily.InterNetwork);
-			_steamLabelSocket.Connect(IPAddress.Loopback, LabelPort);
+			_steamLabelSocket = new UdpClient(new IPEndPoint(IPAddress.Loopback, LabelPort));
 		} catch (SocketException error) {
 			_logger.LogError(error, "Could not bind the local Quest Pro steam label port {Port}", LabelPort);
 		}
