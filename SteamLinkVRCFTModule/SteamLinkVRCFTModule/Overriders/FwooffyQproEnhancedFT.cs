@@ -177,6 +177,13 @@ public class FwooffyQproEnhancedFT : Overrider.IOverider {
 			case UnifiedExpressions.TongueTwistRight:
 				return FromTonguePacketOrDefault(expression, nativeValue);
 
+			// TODO: Implement cheek overrides (CheekPuffLeft, CheekPuffRight, CheekSuckLeft, CheekSuckRight) via CheekPuffTracker / calibration
+			case UnifiedExpressions.CheekPuffLeft:
+			case UnifiedExpressions.CheekPuffRight:
+			case UnifiedExpressions.CheekSuckLeft:
+			case UnifiedExpressions.CheekSuckRight:
+				return nativeValue;
+
 			default:
 				return nativeValue;
 		}
