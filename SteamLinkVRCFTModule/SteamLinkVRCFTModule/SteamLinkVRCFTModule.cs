@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using SteamLinkVRCFTModule;
+using SteamLinkVRCFTModule.Overriders;
 using System.Net.Sockets;
 using VRCFaceTracking;
 using VRCFaceTracking.Core.Library;
@@ -52,6 +53,7 @@ namespace SteamLinkVRCFTModule
 
             OSCHandler = new OSCHandler(Logger, DEFAULT_PORT);
             
+            _overrider = new FwooffyQproEnhancedFT(Logger);
             _overrider.Initialize();
 
             return (_eyeTrackingEnabled, _faceTrackingEnabled);
