@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using System.Text.Json;
+using VRCFaceTracking.Core.Params.Expressions;
 
 namespace SteamLinkVRCFTModule.Overrides.Fwooffy;
 
@@ -39,6 +40,24 @@ public class EyebrowSettings {
 	public float Apply(float nativeWeight) {
 		Refresh();
 		return ApplyWeight(nativeWeight, _settings.Enabled, _settings.Sensitivity);
+	}
+
+	public bool TryApply(UnifiedExpressions expression, float nativeValue, out float result) {
+		switch (expression) {
+			case UnifiedExpressions.BrowPinchLeft:
+			case UnifiedExpressions.BrowLowererLeft:
+			case UnifiedExpressions.BrowPinchRight:
+			case UnifiedExpressions.BrowLowererRight:
+			case UnifiedExpressions.BrowInnerUpLeft:
+			case UnifiedExpressions.BrowInnerUpRight:
+			case UnifiedExpressions.BrowOuterUpLeft:
+			case UnifiedExpressions.BrowOuterUpRight:
+				result = Apply(nativeValue);
+				return true;
+			default:
+				result = nativeValue;
+				return false;
+		}
 	}
 
 	public static Settings Load() {
