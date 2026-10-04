@@ -1,4 +1,10 @@
-# SteamLink Module for VRCFT
+# SteamLink Module for VRCFT (Enhanced Fork)
+
+An enhanced fork of [LinkFT](https://github.com/ykeara/LinkFT) with support for **custom face/eye tracking overrides** and full integration with **[Qpro-Enhanced-FT-Wireless](https://github.com/Fwooffy/Qpro-Enhanced-FT-Wireless)**.
+
+### Key Features
+- **Face & Eye Tracking Overrides**: Flexible `IOverider` architecture allowing interception and modification of any facial blendshape or eye parameter.
+- **Qpro-Enhanced-FT-Wireless Support**: Native integration for enhanced tongue tracking, gaze, pupil diameter, and cheek calibration without breaking the default Steam Link behavior.
 
 The Implementation is **EXPERIMENTAL** and may change without notice causing app to fail.
 
@@ -17,6 +23,35 @@ The Implementation is **EXPERIMENTAL** and may change without notice causing app
   - Share eye tracking data... - on
   - Share Face tracking data... - on
   - OSC Output Port - 9015 (Custom: VRCFT,Etc.)
+
+## Face Tracking Overrides
+
+A flexible override system (`IOverider`) has been introduced to intercept, modify, and selectively override any face tracking (`UnifiedExpressions`) and eye tracking (`EyeExpression`: gaze coordinates, pupil diameter, eyelid positions) values:
+
+- Preserves the stable and familiar behavior of the default module (full tracking for nose, lips, brows, and eyes).
+- Allows hooking external filtering algorithms, calibrations, or neural network models on top of the standard Steam Link stream.
+- Handles forwarding raw OSC messages (`/sl/xrfb/facew/`) for advanced processors.
+
+## Qpro-Enhanced-FT-Wireless Support
+
+Added full support and compatibility with [Qpro-Enhanced-FT-Wireless](https://github.com/Fwooffy/Qpro-Enhanced-FT-Wireless) (A Windows Hub for enhanced face tracking on a rooted Meta Quest Pro).
+
+> **Why this was added:** The module bundled with `Qpro-Enhanced-FT-Wireless` modifies default behaviors and breaks parts of standard tracking (specifically, nose tracking / `NoseSneer` stops working). \
+> This implementation maintains the classic behavior of the standard Steam Link module while providing all necessary communication protocols with the external runtime.
+
+### Installation Instructions (Qpro-Enhanced-FT-Wireless Setup)
+
+1. Compile or download `Qpro.GazeBridge.dll` and `000-Qpro.SteamLink.dll` (these are identical files from the compiled module build).
+2. Place `000-Qpro.SteamLink.dll` into the VRCFT custom libraries folder:
+   ```
+   %AppData%\VRCFaceTracking\CustomLibs\
+   ```
+   *(full path: `C:\Users\<Username>\AppData\Roaming\VRCFaceTracking\CustomLibs\`)*
+3. Place `Qpro.GazeBridge.dll` into the runtime directory:
+   ```
+   QproFaceTracking\QproRuntime\vrcft-gaze-bridge\bin\Release\net10.0\
+   ```
+4. Restart **VRCFaceTracking (VRCFT)**.
 
 ## Mixed Tracking / 混合追踪
 
