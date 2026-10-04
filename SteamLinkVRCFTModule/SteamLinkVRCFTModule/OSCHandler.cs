@@ -21,6 +21,8 @@ namespace SteamLinkVRCFTModule
     {
         public readonly float[] eyeTrackData = new float[3];
         public readonly float[] eyelids = new float[2];
+        
+        public event Action<IReadOnlyList<OSCM>>? OnMessagesReceived;
 
         public static readonly Dictionary<UnifiedExpressions, float> ueData = new(){
             {EyeWideLeft, 0.0f },
@@ -288,6 +290,8 @@ namespace SteamLinkVRCFTModule
                                     ueData[unifiedExpression] = (float)oscMessage.Values[0];                                }
                             }
                         }
+                        
+                        OnMessagesReceived?.Invoke(msgList);
                     }
                     else
                     {

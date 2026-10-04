@@ -55,6 +55,7 @@ namespace SteamLinkVRCFTModule
             
             _overrider = new FwooffyQproEnhancedFT(Logger);
             _overrider.Initialize();
+            OSCHandler.OnMessagesReceived += _overrider.ProcessOscMessages;
 
             return (_eyeTrackingEnabled, _faceTrackingEnabled);
         }

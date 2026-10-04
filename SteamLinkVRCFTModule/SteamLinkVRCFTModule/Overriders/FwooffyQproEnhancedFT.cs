@@ -1,13 +1,47 @@
 ﻿using Microsoft.Extensions.Logging;
 using System.Buffers.Binary;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
+using System.Text.Json;
 using VRCFaceTracking.Core.Params.Expressions;
 
 namespace SteamLinkVRCFTModule.Overriders;
 
 public class FwooffyQproEnhancedFT : Overrider.IOverider {
+	internal static IReadOnlyList<string> ExpressionNames { get; } = Array.AsReadOnly(new[]
+	{
+		"BrowLowererL", "BrowLowererR", "CheekPuffL", "CheekPuffR",
+		"CheekRaiserL", "CheekRaiserR", "CheekSuckL", "CheekSuckR",
+		"ChinRaiserB", "ChinRaiserT", "DimplerL", "DimplerR",
+		"EyesClosedL", "EyesClosedR", "EyesLookDownL", "EyesLookDownR",
+		"EyesLookLeftL", "EyesLookLeftR", "EyesLookRightL", "EyesLookRightR",
+		"EyesLookUpL", "EyesLookUpR", "InnerBrowRaiserL", "InnerBrowRaiserR",
+		"JawDrop", "JawSidewaysLeft", "JawSidewaysRight", "JawThrust",
+		"LidTightenerL", "LidTightenerR", "LipCornerDepressorL",
+		"LipCornerDepressorR", "LipCornerPullerL", "LipCornerPullerR",
+		"LipFunnelerLb", "LipFunnelerLt", "LipFunnelerRb", "LipFunnelerRt",
+		"LipPressorL", "LipPressorR", "LipPuckerL", "LipPuckerR",
+		"LipStretcherL", "LipStretcherR", "LipSuckLb", "LipSuckLt",
+		"LipSuckRb", "LipSuckRt", "LipTightenerL", "LipTightenerR",
+		"LipsToward", "LowerLipDepressorL", "LowerLipDepressorR",
+		"MouthLeft", "MouthRight", "NoseWrinklerL", "NoseWrinklerR",
+		"OuterBrowRaiserL", "OuterBrowRaiserR", "UpperLidRaiserL",
+		"UpperLidRaiserR", "UpperLipRaiserL", "UpperLipRaiserR",
+		"TongueTipInterdental", "TongueTipAlveolar", "TongueFrontDorsalPalate",
+		"TongueMidDorsalPalate", "TongueBackDorsalVelar", "TongueOut",
+		"TongueRetreat"
+	});
+
+	private static readonly Dictionary<string, int> ExpressionIndices = BuildExpressionIndices();
+	private const string FaceWeightPrefix = "/sl/xrfb/facew/";
+	private const long SteamFaceTimeoutMs = 250;
+
+	private static readonly JsonSerializerOptions JsonOptions = new() {
+		PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+	};
+
 	private const int GazePort = 27275;
 	private const int GazePacketBytes = 24;
 	private const long GazeTimeoutMs = 250;
@@ -18,7 +52,6 @@ public class FwooffyQproEnhancedFT : Overrider.IOverider {
 	private const int PupilPacketBytes = 16;
 	private const long PupilTimeoutMs = 350;
 	private const int LabelPort = 27274;
-	private const long SteamFaceTimeoutMs = 500;
 
 	private readonly ILogger _logger;
 	private readonly CancellationTokenSource _cancellationTokenSource = new();
@@ -27,6 +60,17 @@ public class FwooffyQproEnhancedFT : Overrider.IOverider {
 	private UdpClient? _tongueSocket;
 	private UdpClient? _pupilSocket;
 	private UdpClient? _steamLabelSocket;
+
+	private readonly float[] _expressions = new float[70];
+
+	private long _steamLabelSequence;
+	private long _steamSourceChangeSequence;
+	private long _lastSteamFaceTick;
+	private long _lastSteamEyeTick;
+	private long _lastSteamGazeTick;
+	private long _lastPublishedSteamFaceTick;
+	private long _nextSteamSchemaTick;
+	private long _nextSteamLabelTick;
 
 	GazePacket _lastGazePacket;
 	long _lastGazePacketReceivedAt;
@@ -179,6 +223,104 @@ public class FwooffyQproEnhancedFT : Overrider.IOverider {
 		};
 
 		return float.IsFinite(value) ? Math.Clamp(value, 0.0f, 1.0f) : defaultValue;
+	}
+
+	public void ProcessOscMessages(IReadOnlyList<OSCM> messages) {
+		long tick = Environment.TickCount64;
+
+		foreach (var oscMessage in messages) {
+			if (oscMessage == null || oscMessage.Values.Count == 0)
+				continue;
+
+			string address = oscMessage.Address;
+			if (address.StartsWith(FaceWeightPrefix, StringComparison.OrdinalIgnoreCase)) {
+				string name = address[FaceWeightPrefix.Length..];
+				if (ExpressionIndices.TryGetValue(name, out int index)) {
+					float val = Convert.ToSingle(oscMessage.Values[0]);
+					_expressions[index] = Math.Clamp(val, 0f, 1f);
+					_lastSteamFaceTick = tick;
+					if (name is "EyesClosedL" or "EyesClosedR" or "LidTightenerL" or "LidTightenerR")
+						_lastSteamEyeTick = tick;
+				}
+			} else if (address == "/sl/eyeTrackedGazePoint") {
+				_lastSteamGazeTick = tick;
+			}
+		}
+
+		PublishSteamLabels(tick, _expressions);
+	}
+
+	private void PublishSteamLabels(long now, ReadOnlySpan<float> expressions) {
+		if (_steamLabelSocket is null)
+			return;
+
+		long qpc = Stopwatch.GetTimestamp();
+		try {
+			if (qpc >= _nextSteamSchemaTick) {
+				SendSteamLabel(new {
+					V = 1,
+					Type = "schema",
+					Names = ExpressionNames
+				});
+				_nextSteamSchemaTick = qpc + Stopwatch.Frequency * 2;
+			}
+
+			if (qpc < _nextSteamLabelTick)
+				return;
+
+			_nextSteamLabelTick = qpc + Stopwatch.Frequency / 60;
+
+			if (_lastPublishedSteamFaceTick != _lastSteamFaceTick) {
+				_lastPublishedSteamFaceTick = _lastSteamFaceTick;
+				++_steamSourceChangeSequence;
+			}
+
+			bool gazeValid = _lastSteamGazeTick != 0 && (now - _lastSteamGazeTick <= SteamFaceTimeoutMs);
+			bool lowerFaceValid = _lastSteamFaceTick != 0 && (now - _lastSteamFaceTick <= SteamFaceTimeoutMs);
+			bool upperFaceValid = _lastSteamEyeTick != 0 && (now - _lastSteamEyeTick <= SteamFaceTimeoutMs);
+
+			SendSteamLabel(new {
+				V = 1,
+				Type = "sample",
+				Sequence = ++_steamLabelSequence,
+				Qpc = qpc,
+				QpcFrequency = Stopwatch.Frequency,
+				UtcUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+				SourceChangeSequence = _steamSourceChangeSequence,
+				SourceUnchangedMs = _lastSteamFaceTick != 0 ? (double)(now - _lastSteamFaceTick) : 0.0,
+				Values = expressions.ToArray(),
+				// Bit 1 is Virtual Desktop's alternate tongue layout, which
+				// Steam Link's named XR_FB weights do not use.
+				FaceFlags = lowerFaceValid ? 1 : 0,
+				IsEyeFollowingBlendshapesValid = upperFaceValid,
+				LeftEyeIsValid = gazeValid,
+				RightEyeIsValid = gazeValid,
+				LeftEyeOrientation = new float[] { 0, 0, 0, 1 },
+				RightEyeOrientation = new float[] { 0, 0, 0, 1 },
+				LeftEyePosition = new float[] { 0, 0, 0 },
+				RightEyePosition = new float[] { 0, 0, 0 },
+				LeftEyeConfidence = gazeValid ? 1.0f : 0.0f,
+				RightEyeConfidence = gazeValid ? 1.0f : 0.0f
+			});
+		} catch (SocketException) {
+			// The label receiver is optional for ordinary live tracking.
+		}
+	}
+
+	private void SendSteamLabel<T>(T message) {
+		if (_steamLabelSocket is null)
+			return;
+
+		byte[] packet = JsonSerializer.SerializeToUtf8Bytes(message, JsonOptions);
+		_steamLabelSocket.Send(packet, packet.Length);
+	}
+
+	private static Dictionary<string, int> BuildExpressionIndices() {
+		var dict = new Dictionary<string, int>(ExpressionNames.Count, StringComparer.OrdinalIgnoreCase);
+		for (int i = 0; i < ExpressionNames.Count; i++) {
+			dict[ExpressionNames[i]] = i;
+		}
+		return dict;
 	}
 
 	[StructLayout(LayoutKind.Sequential, Pack = 1)]
