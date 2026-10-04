@@ -155,6 +155,14 @@ public class FwooffyQproEnhancedFT : Overrider.IOverider {
 				return FromPupilPacketOrDefault(false, nativeValue);
 			case Overrider.EyeExpression.EyeRightPupilDiameter:
 				return FromPupilPacketOrDefault(true, nativeValue);
+			
+			// VRCFT normalizes combined dilation using these limits. The relative
+			// camera estimate eases from 2 to 8 with neutral at 5, so use the
+			// same range to make VRChat's 0..1 animation respond visibly.
+			case Overrider.EyeExpression.EyeMaxDilation:
+				return _lastPupilPacket.IsHeaderValid ? 8.0f : nativeValue;
+			case Overrider.EyeExpression.EyeMinDilation:
+				return _lastPupilPacket.IsHeaderValid ? 2.0f : nativeValue;
 
 			default:
 				return nativeValue;
