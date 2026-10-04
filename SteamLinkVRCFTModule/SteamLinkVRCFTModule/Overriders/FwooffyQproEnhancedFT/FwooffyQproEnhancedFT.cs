@@ -7,9 +7,9 @@ using System.Runtime.InteropServices;
 using System.Text.Json;
 using VRCFaceTracking.Core.Params.Expressions;
 
-namespace SteamLinkVRCFTModule.Overriders;
+namespace SteamLinkVRCFTModule.Overrides.Fwooffy;
 
-public class FwooffyQproEnhancedFT : Overrider.IOverider {
+public class QproEnhancedFT : IOverrider {
 	internal static IReadOnlyList<string> ExpressionNames { get; } = Array.AsReadOnly(new[] {
 		"BrowLowererL", "BrowLowererR", "CheekPuffL", "CheekPuffR",
 		"CheekRaiserL", "CheekRaiserR", "CheekSuckL", "CheekSuckR",
@@ -54,6 +54,7 @@ public class FwooffyQproEnhancedFT : Overrider.IOverider {
 	private const int CheekTelemetryPort = 27278;
 	private static readonly IPEndPoint CheekTelemetryEndpoint = new(IPAddress.Loopback, CheekTelemetryPort);
 
+	private readonly EyebrowSettings _eyebrowSettings;
 	private readonly ILogger _logger;
 	private readonly CancellationTokenSource _cancellationTokenSource = new();
 
@@ -85,8 +86,9 @@ public class FwooffyQproEnhancedFT : Overrider.IOverider {
 	long _lastTonguePacketReceivedAt;
 
 
-	public FwooffyQproEnhancedFT(ILogger logger) {
+	public QproEnhancedFT(ILogger logger) {
 		_logger = logger;
+		_eyebrowSettings = new EyebrowSettings(logger);
 	}
 
 	public void Initialize() {
@@ -123,6 +125,8 @@ public class FwooffyQproEnhancedFT : Overrider.IOverider {
 		} catch (SocketException error) {
 			_logger.LogWarning(error, "Cheek calibration preview could not open its local output socket.");
 		}
+
+		_eyebrowSettings.Refresh();
 	}
 
 	public void Teardown() {
@@ -139,29 +143,29 @@ public class FwooffyQproEnhancedFT : Overrider.IOverider {
 		_cheekTelemetrySocket = null;
 	}
 
-	public float Apply(Overrider.EyeExpression expression, float nativeValue) {
+	public float Apply(EyeExpression expression, float nativeValue) {
 		switch (expression) {
-			case Overrider.EyeExpression.EyeLeftGazeX:
+			case EyeExpression.EyeLeftGazeX:
 				return FromGazePacketOrDefault(false, true, nativeValue);
-			case Overrider.EyeExpression.EyeLeftGazeY:
+			case EyeExpression.EyeLeftGazeY:
 				return FromGazePacketOrDefault(false, false, nativeValue);
 
-			case Overrider.EyeExpression.EyeRightGazeX:
+			case EyeExpression.EyeRightGazeX:
 				return FromGazePacketOrDefault(true, true, nativeValue);
-			case Overrider.EyeExpression.EyeRightGazeY:
+			case EyeExpression.EyeRightGazeY:
 				return FromGazePacketOrDefault(true, false, nativeValue);
 
-			case Overrider.EyeExpression.EyeLeftPupilDiameter:
+			case EyeExpression.EyeLeftPupilDiameter:
 				return FromPupilPacketOrDefault(false, nativeValue);
-			case Overrider.EyeExpression.EyeRightPupilDiameter:
+			case EyeExpression.EyeRightPupilDiameter:
 				return FromPupilPacketOrDefault(true, nativeValue);
 			
 			// VRCFT normalizes combined dilation using these limits. The relative
 			// camera estimate eases from 2 to 8 with neutral at 5, so use the
 			// same range to make VRChat's 0..1 animation respond visibly.
-			case Overrider.EyeExpression.EyeMaxDilation:
+			case EyeExpression.EyeMaxDilation:
 				return _lastPupilPacket.IsHeaderValid ? 8.0f : nativeValue;
-			case Overrider.EyeExpression.EyeMinDilation:
+			case EyeExpression.EyeMinDilation:
 				return _lastPupilPacket.IsHeaderValid ? 2.0f : nativeValue;
 
 			default:
@@ -184,6 +188,16 @@ public class FwooffyQproEnhancedFT : Overrider.IOverider {
 			case UnifiedExpressions.TongueTwistLeft:
 			case UnifiedExpressions.TongueTwistRight:
 				return FromTonguePacketOrDefault(expression, nativeValue);
+
+			case UnifiedExpressions.BrowPinchLeft:
+			case UnifiedExpressions.BrowLowererLeft:
+			case UnifiedExpressions.BrowPinchRight:
+			case UnifiedExpressions.BrowLowererRight:
+			case UnifiedExpressions.BrowInnerUpLeft:
+			case UnifiedExpressions.BrowInnerUpRight:
+			case UnifiedExpressions.BrowOuterUpLeft:
+			case UnifiedExpressions.BrowOuterUpRight:
+				return _eyebrowSettings.Apply(nativeValue);
 
 			// TODO: Implement cheek overrides (CheekPuffLeft, CheekPuffRight, CheekSuckLeft, CheekSuckRight) via CheekPuffTracker / calibration
 			case UnifiedExpressions.CheekPuffLeft:
@@ -284,8 +298,8 @@ public class FwooffyQproEnhancedFT : Overrider.IOverider {
 		_nextCheekTelemetryTick = nowMs + 50;
 
 		// Expression index constants for OpenXR XR_FB expressions
-		const int CheekPuffLIndex = 2;
-		const int CheekPuffRIndex = 3;
+		const int CheekPuffLIndex = 2; // CheekPuffL in ExpressionNames
+		const int CheekPuffRIndex = 3; // CheekPuffR in ExpressionNames
 
 		float left = expressions.Length > CheekPuffLIndex && float.IsFinite(expressions[CheekPuffLIndex])
 			? Math.Clamp(expressions[CheekPuffLIndex], 0.0f, 1.0f)

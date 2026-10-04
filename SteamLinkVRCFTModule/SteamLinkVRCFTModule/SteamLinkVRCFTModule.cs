@@ -1,7 +1,5 @@
 using Microsoft.Extensions.Logging;
-using SteamLinkVRCFTModule;
-using SteamLinkVRCFTModule.Overriders;
-using System.Net.Sockets;
+using SteamLinkVRCFTModule.Overrides;
 using VRCFaceTracking;
 using VRCFaceTracking.Core.Library;
 using VRCFaceTracking.Core.Params.Expressions;
@@ -16,7 +14,7 @@ namespace SteamLinkVRCFTModule
 
         private bool _eyeTrackingEnabled;
         private bool _faceTrackingEnabled;
-        private Overrider.IOverider _overrider = new Overrider.Nop();
+        private IOverrider _overrider = new NopOverrider();
 
         public override (bool SupportsEye, bool SupportsExpression) Supported => (true, true);
 
@@ -52,7 +50,7 @@ namespace SteamLinkVRCFTModule
             }
             
             // TODO: extract to config.
-            _overrider = new FwooffyQproEnhancedFT(Logger);
+            _overrider = new Overrides.Fwooffy.QproEnhancedFT(Logger);
             _overrider.Initialize();
 
             OSCHandler = new OSCHandler(Logger, DEFAULT_PORT);
@@ -90,26 +88,26 @@ namespace SteamLinkVRCFTModule
                     fNmAngleY = 0.0f;
                 }
 
-                UnifiedTracking.Data.Eye.Left.Gaze.x = _overrider.Apply(Overrider.EyeExpression.EyeLeftGazeX, fAngleX);
-                UnifiedTracking.Data.Eye.Left.Gaze.y = _overrider.Apply(Overrider.EyeExpression.EyeLeftGazeY, fAngleY);
+                UnifiedTracking.Data.Eye.Left.Gaze.x = _overrider.Apply(EyeExpression.EyeLeftGazeX, fAngleX);
+                UnifiedTracking.Data.Eye.Left.Gaze.y = _overrider.Apply(EyeExpression.EyeLeftGazeY, fAngleY);
 
-                UnifiedTracking.Data.Eye.Right.Gaze.x = _overrider.Apply(Overrider.EyeExpression.EyeRightGazeX, fAngleX);
-                UnifiedTracking.Data.Eye.Right.Gaze.y = _overrider.Apply(Overrider.EyeExpression.EyeRightGazeY, fAngleY);
+                UnifiedTracking.Data.Eye.Right.Gaze.x = _overrider.Apply(EyeExpression.EyeRightGazeX, fAngleX);
+                UnifiedTracking.Data.Eye.Right.Gaze.y = _overrider.Apply(EyeExpression.EyeRightGazeY, fAngleY);
 
                 //Pupil Dilation, This is not supported, but if we don't set it can cause issues
                 const float defaultPupilDiameterMm = 5f;
-                UnifiedTracking.Data.Eye.Left.PupilDiameter_MM = _overrider.Apply(Overrider.EyeExpression.EyeLeftPupilDiameter, defaultPupilDiameterMm);
-                UnifiedTracking.Data.Eye.Right.PupilDiameter_MM = _overrider.Apply(Overrider.EyeExpression.EyeRightPupilDiameter, defaultPupilDiameterMm);
-                UnifiedTracking.Data.Eye._maxDilation = _overrider.Apply(Overrider.EyeExpression.EyeMaxDilation, 10);
-                UnifiedTracking.Data.Eye._minDilation = _overrider.Apply(Overrider.EyeExpression.EyeMinDilation, 0);
+                UnifiedTracking.Data.Eye.Left.PupilDiameter_MM = _overrider.Apply(EyeExpression.EyeLeftPupilDiameter, defaultPupilDiameterMm);
+                UnifiedTracking.Data.Eye.Right.PupilDiameter_MM = _overrider.Apply(EyeExpression.EyeRightPupilDiameter, defaultPupilDiameterMm);
+                UnifiedTracking.Data.Eye._maxDilation = _overrider.Apply(EyeExpression.EyeMaxDilation, 10);
+                UnifiedTracking.Data.Eye._minDilation = _overrider.Apply(EyeExpression.EyeMinDilation, 0);
             }
 
             {
                 float fLeftOpenness = CalculateEyeOpenness(OSCHandler.eyelids[0], OSCHandler.ueData[UnifiedExpressions.EyeSquintLeft]);
                 float fRightOpenness = CalculateEyeOpenness(OSCHandler.eyelids[1], OSCHandler.ueData[UnifiedExpressions.EyeSquintRight]);
 
-                UnifiedTracking.Data.Eye.Left.Openness = _overrider.Apply(Overrider.EyeExpression.EyeLeftOpenness, fLeftOpenness);
-                UnifiedTracking.Data.Eye.Right.Openness = _overrider.Apply(Overrider.EyeExpression.EyeRightOpenness, fRightOpenness);
+                UnifiedTracking.Data.Eye.Left.Openness = _overrider.Apply(EyeExpression.EyeLeftOpenness, fLeftOpenness);
+                UnifiedTracking.Data.Eye.Right.Openness = _overrider.Apply(EyeExpression.EyeRightOpenness, fRightOpenness);
             }
         }
 
