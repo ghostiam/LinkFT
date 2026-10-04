@@ -4,7 +4,7 @@ An enhanced fork of [LinkFT](https://github.com/ykeara/LinkFT) with support for 
 
 ### Key Features
 - **Face & Eye Tracking Overrides**: Flexible `IOverrider` architecture allowing interception and modification of any facial blendshape or eye parameter.
-- **Qpro-Enhanced-FT-Wireless Support**: Native integration for enhanced tongue tracking, gaze, pupil diameter, and cheek calibration without breaking the default Steam Link behavior.
+- **Qpro-Enhanced-FT-Wireless Support**: Native integration for enhanced tongue tracking, gaze, pupil diameter, and cheek without breaking the default Steam Link behavior.
 
 The Implementation is **EXPERIMENTAL** and may change without notice causing app to fail.
 
@@ -23,14 +23,6 @@ The Implementation is **EXPERIMENTAL** and may change without notice causing app
   - Share eye tracking data... - on
   - Share Face tracking data... - on
   - OSC Output Port - 9015 (Custom: VRCFT,Etc.)
-
-## Face Tracking Overrides
-
-A flexible override system (`IOverrider`) has been introduced to intercept, modify, and selectively override any face tracking (`UnifiedExpressions`) and eye tracking (`EyeExpression`: gaze coordinates, pupil diameter, eyelid positions) values:
-
-- Preserves the stable and familiar behavior of the default module (full tracking for nose, lips, brows, and eyes).
-- Allows hooking external filtering algorithms, calibrations, or neural network models on top of the standard Steam Link stream.
-- Handles forwarding raw OSC messages (`/sl/xrfb/facew/`) for advanced processors.
 
 ## Qpro-Enhanced-FT-Wireless Support
 
@@ -54,6 +46,14 @@ Added full support and compatibility with [Qpro-Enhanced-FT-Wireless](https://gi
    QproFaceTracking\QproRuntime\vrcft-gaze-bridge\bin\Release\net10.0\
    ```
 4. Restart **VRCFaceTracking (VRCFT)**.
+
+## Face Tracking Overrides
+
+A flexible override system (`IOverrider`) has been introduced to intercept, modify, and selectively override any face tracking (`UnifiedExpressions`) and eye tracking (`EyeExpression`: gaze coordinates, pupil diameter, eyelid positions) values:
+
+- Preserves the stable and familiar behavior of the default module (full tracking for nose, lips, brows, and eyes).
+- Allows hooking external filtering algorithms, calibrations, or neural network models on top of the standard Steam Link stream.
+- Handles forwarding raw OSC messages (`/sl/xrfb/facew/`) for advanced processors.
 
 ## Mixed Tracking / 混合追踪
 
