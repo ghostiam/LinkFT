@@ -12,6 +12,7 @@ public class QproEnhancedFT : IOverrider {
 	private readonly TongueTracking _tongueTracking;
 	private readonly CheekTelemetry _cheekTelemetry;
 	private readonly SteamLabels _steamLabels;
+	private readonly SmirkTracking _smirkTracking;
 
 	private readonly float[] _expressions = new float[70];
 	private long _lastSteamFaceTick;
@@ -25,6 +26,7 @@ public class QproEnhancedFT : IOverrider {
 		_tongueTracking = new TongueTracking(logger);
 		_cheekTelemetry = new CheekTelemetry(logger);
 		_steamLabels = new SteamLabels(logger);
+		_smirkTracking = new SmirkTracking(logger);
 	}
 
 	public void Initialize() {
@@ -62,6 +64,8 @@ public class QproEnhancedFT : IOverrider {
 			return tongueVal;
 		if (_eyebrowSettings.TryApply(expression, nativeValue, out float eyebrowVal))
 			return eyebrowVal;
+		if (_smirkTracking.TryApply(expression, nativeValue, out float smirkVal))
+			return smirkVal;
 
 		// TODO: Implement cheek overrides (CheekPuffLeft, CheekPuffRight, CheekSuckLeft, CheekSuckRight) via CheekPuffTracker / calibration
 		return nativeValue;
@@ -89,6 +93,7 @@ public class QproEnhancedFT : IOverrider {
 			}
 		}
 
+		_smirkTracking.Update(_expressions, tick);
 		_cheekTelemetry.Publish(_expressions, tick);
 		_steamLabels.Publish(tick, _expressions, _lastSteamFaceTick, _lastSteamEyeTick, _lastSteamGazeTick);
 	}
