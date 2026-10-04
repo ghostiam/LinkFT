@@ -3,7 +3,7 @@
 An enhanced fork of [LinkFT](https://github.com/ykeara/LinkFT) with support for **custom face/eye tracking overrides** and full integration with **[Qpro-Enhanced-FT-Wireless](https://github.com/Fwooffy/Qpro-Enhanced-FT-Wireless)**.
 
 ### Key Features
-- **Face & Eye Tracking Overrides**: Flexible `IOverider` architecture allowing interception and modification of any facial blendshape or eye parameter.
+- **Face & Eye Tracking Overrides**: Flexible `IOverrider` architecture allowing interception and modification of any facial blendshape or eye parameter.
 - **Qpro-Enhanced-FT-Wireless Support**: Native integration for enhanced tongue tracking, gaze, pupil diameter, and cheek calibration without breaking the default Steam Link behavior.
 
 The Implementation is **EXPERIMENTAL** and may change without notice causing app to fail.
@@ -26,7 +26,7 @@ The Implementation is **EXPERIMENTAL** and may change without notice causing app
 
 ## Face Tracking Overrides
 
-A flexible override system (`IOverider`) has been introduced to intercept, modify, and selectively override any face tracking (`UnifiedExpressions`) and eye tracking (`EyeExpression`: gaze coordinates, pupil diameter, eyelid positions) values:
+A flexible override system (`IOverrider`) has been introduced to intercept, modify, and selectively override any face tracking (`UnifiedExpressions`) and eye tracking (`EyeExpression`: gaze coordinates, pupil diameter, eyelid positions) values:
 
 - Preserves the stable and familiar behavior of the default module (full tracking for nose, lips, brows, and eyes).
 - Allows hooking external filtering algorithms, calibrations, or neural network models on top of the standard Steam Link stream.
