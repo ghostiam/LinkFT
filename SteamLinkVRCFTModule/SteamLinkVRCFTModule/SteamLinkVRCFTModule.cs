@@ -50,11 +50,12 @@ namespace SteamLinkVRCFTModule
                 Logger.LogInformation("Both eye and expression tracking disabled, staying idle.");
                 return (false, false);
             }
-
-            OSCHandler = new OSCHandler(Logger, DEFAULT_PORT);
             
+            // TODO: extract to config.
             _overrider = new FwooffyQproEnhancedFT(Logger);
             _overrider.Initialize();
+
+            OSCHandler = new OSCHandler(Logger, DEFAULT_PORT);
             OSCHandler.OnMessagesReceived += _overrider.ProcessOscMessages;
 
             return (_eyeTrackingEnabled, _faceTrackingEnabled);
